@@ -4,28 +4,34 @@ import json
 import logging
 import os
 
-def retrieve_songs(duration):
+def retrieve_songs(duration,genre,mood):
     try:
         logging.info("Reading DB settings...")
         my_app_setting_db_cred_value = os.environ["DB_CREDENTIALS"]
-        logging.info("Retrived Settings...")
+
+        logging.info("Connecting to SQL Server...")
         conn = pyodbc.connect(my_app_setting_db_cred_value)
-        df = pd.read_sql_query('SELECT * FROM SONG ORDER BY DURATION', conn)
+
+        #Prepare SQL Query to retrive data based on Genre and Mood
+        sql_query = f"SELECT * FROM SONG WHERE GENRE = '{genre}' AND +\
+                      MOOD = '{mood}' ORDER BY DURATION DESC;"
+
+        #Execute the query on SONG table
+        df = pd.read_sql_query(sql_query, conn)
+
         #CALCULATE CUMMULATIVE SUM FOR ALL SONGS
         df['duration_cummulsum'] = df['duration'].cumsum()
-        print(df)
+
         #FILTER BASED ON DURATION
         logging.info(f"Filtering the records for {duration} seconds...")
-        filtered_df = df[df['duration_cummulsum']<=duration]
-        
-        # IGNORE DURATION_CUMSUM COLUMN
-        #filtered_df = filtered_df[['id','title','song_url','duration']]
-        filtered_df = filtered_df[['song_url']]
-        #print(filtered_df)
+        filtered_df = df[df['duration_cummulsum']<=duration] 
+
+        # Removed unwanted columns
+        filtered_df = filtered_df[['id','title','song_url','duration']]
         result = filtered_df.to_json(orient="records")
         logging.info("Fetched result successfully")
         parsed = json.loads(result)
-        print(json.dumps(parsed,indent=4))
+
         return (200,json.dumps(parsed,indent=4))
 
     except (KeyError,TypeError,NameError) as er:
@@ -37,6 +43,5 @@ def retrieve_songs(duration):
         sqlstate = ex.args[1]
         logging.error(sqlstate)
         return(500,sqlstate)
-
 
 
